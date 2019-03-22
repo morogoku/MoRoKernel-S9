@@ -29,7 +29,7 @@ DEFCONFIG=moro_defconfig
 DEFCONFIG_S9PLUS=moro-965_defconfig
 DEFCONFIG_S9=moro-960_defconfig
 
-export K_VERSION="v0"
+export K_VERSION="v1r01"
 export K_BASE="CSC8"
 export K_NAME="MoRoKernel"
 export REVISION="RC"
