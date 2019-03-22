@@ -689,10 +689,12 @@ out:
 static int sock_set_dns_pid(struct sock *sk, char __user *optval, int optlen)
 {
 	int ret = -EADDRNOTAVAIL;
+#ifdef CONFIG_KNOX_NCM
 	struct pid *pid_struct = NULL;
 	struct task_struct *task = NULL;
 	int process_returnValue = -1;
 	char full_process_name[PROCESS_NAME_LEN_NAP] = {0};
+#endif
 
 	if (optlen < 0)
 		goto out;
@@ -703,6 +705,7 @@ static int sock_set_dns_pid(struct sock *sk, char __user *optval, int optlen)
 		if (copy_from_user(&dns_pid, optval, sizeof(dns_pid)))
 			goto out;
 		memcpy(&sk->knox_dns_pid, &dns_pid, sizeof(sk->knox_dns_pid));
+#ifdef CONFIG_KNOX_NCM
 		if(check_ncm_flag()) {
 			pid_struct = find_get_pid(dns_pid);
 			if (pid_struct != NULL) {
@@ -717,6 +720,7 @@ static int sock_set_dns_pid(struct sock *sk, char __user *optval, int optlen)
 				}
 			}
 		}
+#endif
 		ret = 0;
 	}
 
@@ -1537,7 +1541,7 @@ struct sock *sk_alloc(struct net *net, int family, gfp_t priority,
 		      struct proto *prot, int kern)
 {
 	struct sock *sk;
-
+#ifdef CONFIG_KNOX_NCM
 	/* START_OF_KNOX_NPA */
 	struct pid *pid_struct = NULL;
 	struct task_struct *task = NULL;
@@ -1548,6 +1552,7 @@ struct sock *sk_alloc(struct net *net, int family, gfp_t priority,
 	int parent_returnValue = -1;
 	char full_parent_process_name[PROCESS_NAME_LEN_NAP] = {0};
 	/* END_OF_KNOX_NPA */
+#endif
 
 	sk = sk_prot_alloc(prot, priority | __GFP_ZERO, family);
 	if (sk) {
@@ -1564,6 +1569,7 @@ struct sock *sk_alloc(struct net *net, int family, gfp_t priority,
 		memset(sk->parent_process_name,'\0',sizeof(sk->parent_process_name));
 		memset(sk->dns_process_name,'\0',sizeof(sk->dns_process_name));
 		memset(sk->domain_name,'\0',sizeof(sk->domain_name));
+#ifdef CONFIG_KNOX_NCM
 		if (check_ncm_flag()) {
 			pid_struct = find_get_pid(current->tgid);
 			if (pid_struct != NULL) {
@@ -1594,6 +1600,7 @@ struct sock *sk_alloc(struct net *net, int family, gfp_t priority,
 				}
 			}
 		}
+#endif
 		/* END_OF_KNOX_NPA */
 		/*
 		 * See comment in struct sock definition to understand
