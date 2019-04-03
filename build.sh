@@ -29,12 +29,12 @@ DEFCONFIG=moro_defconfig
 DEFCONFIG_S9PLUS=moro-965_defconfig
 DEFCONFIG_S9=moro-960_defconfig
 
-export K_VERSION="v1r01"
+export K_VERSION="v1.0"
 export K_BASE="CSC8"
-export K_NAME="MoRoKernel"
+export K_NAME="MoRoKernel-Stock"
 export REVISION="RC"
 export KBUILD_BUILD_VERSION="1"
-export KERNEL_VERSION="$K_NAME-$K_BASE-O-$K_VERSION"
+export KERNEL_VERSION="$K_NAME-$MODEL-$K_BASE-P-$K_VERSION"
 
 
 # FUNCTIONS
@@ -236,7 +236,7 @@ if [ $prompt == "1" ]; then
     MODEL=G960
     KERNEL_DEFCONFIG=$DEFCONFIG_S9
     ZIP=yes
-    ZIP_NAME=$K_NAME-$MODEL-O-$K_VERSION.zip
+    ZIP_NAME=$K_NAME-$MODEL-P-$K_VERSION.zip
     MAIN
 	
 elif [ $prompt == "2" ]; then
@@ -246,7 +246,7 @@ elif [ $prompt == "2" ]; then
     MODEL=G965
     KERNEL_DEFCONFIG=$DEFCONFIG_S9PLUS
     ZIP=yes
-    ZIP_NAME=$K_NAME-$MODEL-O-$K_VERSION.zip
+    ZIP_NAME=$K_NAME-$MODEL-P-$K_VERSION.zip
     MAIN
 	
 elif [ $prompt == "3" ]; then
@@ -261,7 +261,7 @@ elif [ $prompt == "3" ]; then
     MODEL=G960
     KERNEL_DEFCONFIG=$DEFCONFIG_S9
     ZIP=yes
-    ZIP_NAME=$K_NAME-G96X-O-$K_VERSION.zip
+    ZIP_NAME=$K_NAME-G96X-P-$K_VERSION.zip
     MAIN
 fi
 
