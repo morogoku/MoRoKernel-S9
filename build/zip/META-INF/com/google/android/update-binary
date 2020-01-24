@@ -1,0 +1,89 @@
+#!/sbin/sh
+
+
+OUTFD=$2
+ZIP=$3
+
+ui_print() {
+  echo -n -e "ui_print $1\n" > /proc/self/fd/$OUTFD
+  echo -n -e "ui_print\n" > /proc/self/fd/$OUTFD
+}
+
+abort() {
+	ui_print "$*";
+	exit 1;
+}
+
+
+cd /tmp
+rm -rf moro
+mkdir moro
+cd moro
+unzip -o "$ZIP"
+
+
+# Define device
+BL=`getprop ro.bootloader`
+DEVICE=${BL:0:4}
+
+if [ ! $DEVICE == "G965" ] && [ ! $DEVICE == "G960" ]; then
+	ui_print " "
+	ui_print "@** UNSUPPORTED DEVICE! **"
+	ui_print "-- The kernel is only for G965 and G960, and this device is $DEVICE. Aborting..."
+	exit 1;
+fi
+
+ui_print " "
+ui_print "***************************************"
+ui_print "*          MoRoKernel S9 v2.0         *"
+ui_print "*            SM-G96XF S9 Q            *"
+ui_print "*                                     *"
+ui_print "*                                     *"
+ui_print "*              Esp-Droids             *"
+ui_print "***************************************"
+ui_print " "
+
+ui_print " -> Mount /system RW"
+
+# Mount system
+block=/dev/block/platform/11120000.ufs/by-name/SYSTEM
+SYSTEM_MOUNT=/system
+SYSTEM=$SYSTEM_MOUNT
+
+# Try to detect system-as-root through $SYSTEM_MOUNT/init.rc like Magisk does
+# Mount whatever $SYSTEM_MOUNT is, sometimes remount is necessary if mounted read-only
+
+grep -q "$SYSTEM_MOUNT.*\sro[\s,]" /proc/mounts && mount -o remount,rw $SYSTEM_MOUNT || mount -o rw "$block" $SYSTEM_MOUNT
+
+# Remount /system to /system_root if we have system-as-root and bind /system to /system_root/system (like Magisk does)
+# For reference, check https://github.com/topjohnwu/Magisk/blob/master/scripts/util_functions.sh
+if [ -f /system/init.rc ]; then
+  ui_print "    Device is system-as-root"
+  ui_print "    Remounting /system as /system_root"
+  mkdir /system_root
+  mount --move /system /system_root
+  mount -o bind /system_root/system /system
+fi
+
+
+ui_print " "
+ui_print " -> Flashing kernel"
+dd of=/dev/block/platform/11120000.ufs/by-name/BOOT if=/tmp/moro/$DEVICE-boot.img
+
+
+ui_print " "
+ui_print " -> INSTALL MAGISK"
+unzip /tmp/moro/magisk/magisk.zip META-INF/com/google/android/* -d /tmp/moro/magisk
+sh /tmp/moro/magisk/META-INF/com/google/android/update-binary dummy 1 /tmp/moro/magisk/magisk.zip
+
+	
+ui_print " "
+ui_print " -> Unmounting system"
+umount -l /system_root 2>/dev/null
+umount -l /system 2>/dev/null
+
+
+ui_print " "
+ui_print "finished"
+rm -rf /tmp/moro
+sync

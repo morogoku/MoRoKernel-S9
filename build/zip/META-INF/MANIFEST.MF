@@ -1,0 +1,33 @@
+Manifest-Version: 1.0
+Created-By: 1.0 (Android SignApk)
+
+Name: META-INF/com/google/android/updater-script
+SHA1-Digest: yegYrJ+MJCAb1l93d6oW7OhVuao=
+
+Name: magisk/magisk.zip
+SHA1-Digest: rTGzc/XA1AV6ssECv3LRKdSsQ9M=
+
+Name: moro/flash_kernel.sh
+SHA1-Digest: gCUPBkpFffgA2UD0NNRE8B/uEbA=
+
+Name: moro/system/vendor/lib/egl/libGLES_mali.so
+SHA1-Digest: YDLPOGWP4pjM9btQMQvFIt2P0p4=
+
+Name: moro/system/vendor/lib64/libsecure_storage.so
+SHA1-Digest: KJaOcI+cq1MR4HMYP0TOokoFmYk=
+
+Name: moro/kernel.tar.xz
+SHA1-Digest: 5RKxHWeVDi0N9QzMqIkmvZ8TOAA=
+
+Name: META-INF/com/google/android/update-binary
+SHA1-Digest: tao0A5Xdyq9VV94ZZEtXMbdNGBQ=
+
+Name: magisk/version
+SHA1-Digest: HZaaDWw9BUOEmkORcGqclfI/Pyc=
+
+Name: moro/system/vendor/lib64/egl/libGLES_mali.so
+SHA1-Digest: j38ixn9SOVNB0nsLhMcAaRqgBY0=
+
+Name: moro/system/vendor/lib/libsecure_storage.so
+SHA1-Digest: auMBllP+9TtVKSSDXAQDJXAk3Wk=
+
