@@ -1,7 +1,7 @@
 /*
  * DHD Bus Module for SDIO
  *
- * Copyright (C) 1999-2018, Broadcom.
+ * Copyright (C) 1999-2019, Broadcom.
  *
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -24,7 +24,7 @@
  *
  * <<Broadcom-WL-IPTag/Open:>>
  *
- * $Id: dhd_sdio.c 784292 2018-10-11 11:34:26Z $
+ * $Id: dhd_sdio.c 814373 2019-04-11 02:01:55Z $
  */
 
 #include <typedefs.h>
@@ -251,6 +251,8 @@ typedef struct dhd_console {
 #define BTFW_HEX_LINE_TYPE_ABSOLUTE_32BIT_ADDRESS	5
 
 #endif /* defined (BT_OVER_SDIO) */
+
+#define SBSDIO_CIS_TINY_SIZE_LIMIT 26
 
 /* Private data for SDIO bus interaction */
 typedef struct dhd_bus {
@@ -902,10 +904,8 @@ dhdsdio_sr_cap(dhd_bus_t *bus)
 		(bus->sih->chip == BCM4358_CHIP_ID) ||
 		(BCM4349_CHIP(bus->sih->chip))		||
 		(bus->sih->chip == BCM4350_CHIP_ID) ||
-		(bus->sih->chip == BCM4362_CHIP_ID) ||
 		(bus->sih->chip == BCM43012_CHIP_ID) ||
-		(bus->sih->chip == BCM43014_CHIP_ID) ||
-		(bus->sih->chip == BCM43751_CHIP_ID)) {
+		(bus->sih->chip == BCM43014_CHIP_ID)) {
 		core_capext = TRUE;
 	} else {
 			core_capext = bcmsdh_reg_read(bus->sdh,
@@ -978,9 +978,7 @@ dhdsdio_sr_init(dhd_bus_t *bus)
 		CHIPID(bus->sih->chip) == BCM43018_CHIP_ID ||
 		CHIPID(bus->sih->chip) == BCM4339_CHIP_ID ||
 		CHIPID(bus->sih->chip) == BCM43012_CHIP_ID ||
-		CHIPID(bus->sih->chip) == BCM4362_CHIP_ID ||
-		CHIPID(bus->sih->chip) == BCM43014_CHIP_ID ||
-		CHIPID(bus->sih->chip) == BCM43751_CHIP_ID)
+		CHIPID(bus->sih->chip) == BCM43014_CHIP_ID)
 		dhdsdio_devcap_set(bus, SDIOD_CCCR_BRCM_CARDCAP_CMD_NODEC);
 
 	if (bus->sih->chip == BCM43012_CHIP_ID) {
@@ -7543,13 +7541,6 @@ dhdsdio_chipmatch(uint16 chipid)
 	if (chipid == BCM43014_CHIP_ID)
 		return TRUE;
 
-	if (chipid == BCM4369_CHIP_ID)
-		return TRUE;
-
-	if (BCM4378_CHIP(chipid)) {
-		return TRUE;
-	}
-
 	return FALSE;
 }
 
@@ -7770,7 +7761,7 @@ dhdsdio_probe_attach(struct dhd_bus *bus, osl_t *osh, void *sdh, void *regsva,
 	uint8 clkctl = 0;
 #endif /* !BCMSPI */
 	uint fn, numfn;
-	uint8 *cis[SDIOD_MAX_IOFUNCS];
+	uint8 *cis = NULL;
 	int32 value;
 	int err = 0;
 
@@ -7820,47 +7811,56 @@ dhdsdio_probe_attach(struct dhd_bus *bus, osl_t *osh, void *sdh, void *regsva,
 		numfn = 0; /* internally func is hardcoded to 1 as gSPI has cis on F1 only */
 #endif /* !BCMSPI */
 #ifndef BCMSDIOLITE
+		if (!(cis = MALLOC(osh, SBSDIO_CIS_SIZE_LIMIT))) {
+			DHD_INFO(("dhdsdio_probe: cis malloc failed\n"));
+			goto fail;
+		}
+		bzero(cis, SBSDIO_CIS_SIZE_LIMIT);
+
 		for (fn = 0; fn <= numfn; fn++) {
-			if (!(cis[fn] = MALLOC(osh, SBSDIO_CIS_SIZE_LIMIT))) {
-				DHD_INFO(("dhdsdio_probe: fn %d cis malloc failed\n", fn));
-				break;
+			if (DHD_INFO_ON()) {
+				if ((err = bcmsdh_cis_read(sdh, fn, cis,
+						SBSDIO_CIS_SIZE_LIMIT))) {
+					DHD_INFO(("dhdsdio_probe: fn %d cis read err %d\n",
+						fn, err));
+					break;
+				}
+#ifdef DHD_DEBUG
+				dhd_dump_cis(fn, cis);
+#endif /* DHD_DEBUG */
 			}
-			bzero(cis[fn], SBSDIO_CIS_SIZE_LIMIT);
-
-			if ((err = bcmsdh_cis_read(sdh, fn, cis[fn],
-			                                 SBSDIO_CIS_SIZE_LIMIT))) {
-				DHD_INFO(("dhdsdio_probe: fn %d cis read err %d\n", fn, err));
-				MFREE(osh, cis[fn], SBSDIO_CIS_SIZE_LIMIT);
-				break;
+			else
+			{
+				if (fn > 0) {
+					if ((err = bcmsdh_cis_read(sdh, fn, cis,
+							SBSDIO_CIS_TINY_SIZE_LIMIT))) {
+						DHD_INFO(("dhdsdio_probe: fn %d cis read err %d\n",
+							fn, err));
+						break;
+					}
+				}
 			}
 
-		/* Reading the F1, F2 and F3 max blocksize values from CIS
-		  * and writing into the F1, F2 and F3	block size registers.
-		  * There is no max block size register value available for F0 in CIS register.
-		  * So, setting default value for F0 block size as 32 (which was set earlier
-		  * in iovar). IOVAR takes only one arguement.
-		  * So, we are passing the function number alongwith the value (fn<<16)
-		*/
+			/* Reading the F1, F2 and F3 max blocksize values from CIS
+			 * and writing into the F1, F2 and F3	block size registers.
+			 * There is no max block size register value available for F0 in CIS
+			 * register.
+			 * So, setting default value for F0 block size as 32 (which was set earlier
+			 * in iovar). IOVAR takes only one arguement.
+			 * So, we are passing the function number alongwith the value (fn<<16)
+			 */
 			if (!fn)
 				value = F0_BLOCK_SIZE;
 			else
-				value = (cis[fn][25]<<8) | cis[fn][24] | (fn<<16);
+				value = (cis[25]<<8) | cis[24] | (fn<<16);
 			if (bcmsdh_iovar_op(sdh, "sd_blocksize", NULL, 0, &value,
-				sizeof(value), TRUE) != BCME_OK) {
+					sizeof(value), TRUE) != BCME_OK) {
 				bus->blocksize = 0;
 				DHD_ERROR(("%s: fail on %s get\n", __FUNCTION__,
 					"sd_blocksize"));
 			}
-#ifdef DHD_DEBUG
-			if (DHD_INFO_ON()) {
-				dhd_dump_cis(fn, cis[fn]);
-			}
-#endif /* DHD_DEBUG */
 		}
-	while (fn-- > 0) {
-		ASSERT(cis[fn]);
-		MFREE(osh, cis[fn], SBSDIO_CIS_SIZE_LIMIT);
-	}
+		MFREE(osh, cis, SBSDIO_CIS_SIZE_LIMIT);
 #else
 	BCM_REFERENCE(cis);
 	BCM_REFERENCE(fn);
@@ -7944,12 +7944,6 @@ dhdsdio_probe_attach(struct dhd_bus *bus, osl_t *osh, void *sdh, void *regsva,
 				break;
 			case BCM4364_CHIP_ID:
 				bus->dongle_ram_base = CR4_4364_RAM_BASE;
-				break;
-			case BCM4369_CHIP_ID:
-				bus->dongle_ram_base = CR4_4369_RAM_BASE;
-				break;
-			case BCM4378_CHIP_GRPID:
-				bus->dongle_ram_base = CR4_4378_RAM_BASE;
 				break;
 			default:
 				bus->dongle_ram_base = 0;
@@ -8382,10 +8376,14 @@ dhdsdio_suspend(void *context)
 	}
 
 	DHD_LINUX_GENERAL_LOCK(bus->dhd, flags);
+	/* stop all interface network queue. */
+	dhd_txflowcontrol(bus->dhd, ALL_INTERFACES, ON);
 	bus->dhd->busstate = DHD_BUS_SUSPEND;
 	if (DHD_BUS_BUSY_CHECK_IN_TX(bus->dhd)) {
 		DHD_ERROR(("Tx Request is not ended\n"));
 		bus->dhd->busstate = DHD_BUS_DATA;
+		/* resume all interface network queue. */
+		dhd_txflowcontrol(bus->dhd, ALL_INTERFACES, OFF);
 		DHD_LINUX_GENERAL_UNLOCK(bus->dhd, flags);
 		return -EBUSY;
 	}
@@ -8411,6 +8409,8 @@ dhdsdio_suspend(void *context)
 	DHD_LINUX_GENERAL_LOCK(bus->dhd, flags);
 	if (ret) {
 		bus->dhd->busstate = DHD_BUS_DATA;
+		/* resume all interface network queue. */
+		dhd_txflowcontrol(bus->dhd, ALL_INTERFACES, OFF);
 	}
 	DHD_BUS_BUSY_CLEAR_SUSPEND_IN_PROGRESS(bus->dhd);
 	dhd_os_busbusy_wake(bus->dhd);
@@ -8443,6 +8443,8 @@ dhdsdio_resume(void *context)
 	DHD_BUS_BUSY_CLEAR_RESUME_IN_PROGRESS(bus->dhd);
 	bus->dhd->busstate = DHD_BUS_DATA;
 	dhd_os_busbusy_wake(bus->dhd);
+	/* resume all interface network queue. */
+	dhd_txflowcontrol(bus->dhd, ALL_INTERFACES, OFF);
 	DHD_LINUX_GENERAL_UNLOCK(bus->dhd, flags);
 
 	return 0;
@@ -9257,6 +9259,29 @@ static int concate_revision_bcm4354(dhd_bus_t *bus, char *fw_path, char *nv_path
 	return 0;
 }
 
+#ifdef SUPPORT_MULTIPLE_CHIP_4345X
+static int
+concate_revision_bcm4345x(dhd_bus_t *bus,
+	char *fw_path, char *nv_path)
+{
+	uint32 chip_id;
+	char chipver_tag[10] = "_43454";
+
+	chip_id = bus->sih->chip;
+
+	if (chip_id == BCM43454_CHIP_ID) {
+		DHD_ERROR(("----- CHIP 43454 -----\n"));
+		strcat(fw_path, chipver_tag);
+		strcat(nv_path, chipver_tag);
+	} else if (chip_id == BCM4345_CHIP_ID) {
+		DHD_ERROR(("----- CHIP 43455  -----\n"));
+	} else {
+		DHD_ERROR(("----- Unknown chip , id r=%x -----\n", chip_id));
+	}
+
+	return 0;
+}
+#else /* SUPPORT_MULTIPLE_CHIP_4345X */
 static int
 concate_revision_bcm43454(dhd_bus_t *bus, char *fw_path, char *nv_path)
 {
@@ -9289,6 +9314,73 @@ concate_revision_bcm43454(dhd_bus_t *bus, char *fw_path, char *nv_path)
 	return 0;
 }
 
+static int
+concate_revision_bcm43455(dhd_bus_t *bus, char *fw_path, char *nv_path)
+{
+	char chipver_tag[10] = {0, };
+	uint32 chip_rev = 0;
+#ifdef SUPPORT_MULTIPLE_BOARD_REV_FROM_DT
+	int base_system_rev_for_nv = 0;
+#endif /* SUPPORT_MULTIPLE_BOARD_REV_FROM_DT */
+
+	DHD_TRACE(("%s: BCM43455 Multiple Revision Check\n", __FUNCTION__));
+	if (bus->sih->chip != BCM4345_CHIP_ID) {
+		DHD_ERROR(("%s:Chip is not BCM43455!\n", __FUNCTION__));
+		return -1;
+	}
+
+	chip_rev = bus->sih->chiprev;
+	if (chip_rev == 0x9) {
+		DHD_ERROR(("----- CHIP 43456 -----\n"));
+		strcat(fw_path, "_c5");
+		strcat(nv_path, "_c5");
+	} else {
+		DHD_ERROR(("----- CHIP 43455  -----\n"));
+	}
+#ifdef SUPPORT_MULTIPLE_BOARD_REV_FROM_DT
+	base_system_rev_for_nv = dhd_get_system_rev();
+	if (base_system_rev_for_nv > 0) {
+		DHD_ERROR(("----- Board Rev  [%d]-----\n", base_system_rev_for_nv));
+		sprintf(chipver_tag, "_r%02d", base_system_rev_for_nv);
+	}
+#endif /* SUPPORT_MULTIPLE_BOARD_REV_FROM_DT */
+	strcat(nv_path, chipver_tag);
+	return 0;
+}
+#endif /* SUPPORT_MULTIPLE_CHIP_4345X */
+
+static int
+concate_revision_bcm43430(dhd_bus_t *bus, char *fw_path, char *nv_path)
+{
+
+	uint chipver;
+	char chipver_tag[4] = {0, };
+
+	DHD_TRACE(("%s: BCM43430 Multiple Revision Check\n", __FUNCTION__));
+	if (bus->sih->chip != BCM43430_CHIP_ID) {
+		DHD_ERROR(("%s:Chip is not BCM43430\n", __FUNCTION__));
+		return BCME_ERROR;
+	}
+	chipver = bus->sih->chiprev;
+	DHD_ERROR(("CHIP VER = [0x%x]\n", chipver));
+	if (chipver == 0x0) {
+		DHD_ERROR(("----- CHIP bcm4343S -----\n"));
+		strcat(chipver_tag, "_3s");
+	} else if (chipver == 0x1) {
+		DHD_ERROR(("----- CHIP bcm43438 -----\n"));
+	} else if (chipver == 0x2) {
+		DHD_ERROR(("----- CHIP bcm43436L -----\n"));
+		strcat(chipver_tag, "_36");
+	} else {
+		DHD_ERROR(("----- CHIP bcm43430 unknown revision %d -----\n",
+			chipver));
+	}
+
+	strcat(fw_path, chipver_tag);
+	strcat(nv_path, chipver_tag);
+	return 0;
+}
+
 int
 concate_revision(dhd_bus_t *bus, char *fw_path, char *nv_path)
 {
@@ -9302,7 +9394,6 @@ concate_revision(dhd_bus_t *bus, char *fw_path, char *nv_path)
 	switch (bus->sih->chip) {
 	case BCM4335_CHIP_ID:
 		res = concate_revision_bcm4335(bus, fw_path, nv_path);
-
 		break;
 	case BCM4339_CHIP_ID:
 		res = concate_revision_bcm4339(bus, fw_path, nv_path);
@@ -9313,8 +9404,21 @@ concate_revision(dhd_bus_t *bus, char *fw_path, char *nv_path)
 	case BCM4354_CHIP_ID:
 		res = concate_revision_bcm4354(bus, fw_path, nv_path);
 		break;
+#ifdef SUPPORT_MULTIPLE_CHIP_4345X
+	case BCM43454_CHIP_ID:
+	case BCM4345_CHIP_ID:
+		res = concate_revision_bcm4345x(bus, fw_path, nv_path);
+		break;
+#else /* SUPPORT_MULTIPLE_CHIP_4345X */
 	case BCM43454_CHIP_ID:
 		res = concate_revision_bcm43454(bus, fw_path, nv_path);
+		break;
+	case BCM4345_CHIP_ID:
+		res = concate_revision_bcm43455(bus, fw_path, nv_path);
+		break;
+#endif /* SUPPORT_MULTIPLE_CHIP_4345X */
+	case BCM43430_CHIP_ID:
+		res = concate_revision_bcm43430(bus, fw_path, nv_path);
 		break;
 
 	default:
