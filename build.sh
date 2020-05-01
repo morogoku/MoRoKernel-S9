@@ -172,10 +172,10 @@ MAIN()
 	FUNC_DELETE_PLACEHOLDERS
 	FUNC_BUILD_KERNEL
 	FUNC_BUILD_DTB
-	FUNC_BUILD_RAMDISK
-	if [ $ZIP == "yes" ]; then
-	    FUNC_BUILD_FLASHABLES
-	fi
+	#FUNC_BUILD_RAMDISK
+	#if [ $ZIP == "yes" ]; then
+	#    FUNC_BUILD_FLASHABLES
+	#fi
 	END_TIME=`date +%s`
 	let "ELAPSED_TIME=$END_TIME-$START_TIME"
 	echo "Total compile time is $ELAPSED_TIME seconds"
