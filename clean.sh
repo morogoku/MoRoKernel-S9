@@ -18,6 +18,8 @@ rm -f $PWD/build/zip/*.img
 rm -rf $PWD/net/wireguard
 rm -rf $PWD/scripts/fmp/__pycache__
 rm -rf $PWD/scripts/crypto/__pycache__
+rm -rf $PWD/arch/arm64/boot/dtb.img
+rm -rf $PWD/arch/arm64/boot/Image
 
 cp -f $PWD/build/ologk.h $PWD/include/linux
 
