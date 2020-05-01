@@ -19,6 +19,8 @@ rm -rf $PWD/net/wireguard
 rm -rf $PWD/scripts/fmp/__pycache__
 rm -rf $PWD/scripts/crypto/__pycache__
 
+cp -f $PWD/build/ologk.h $PWD/include/linux
+
 
 # Removed Created dtb Folder
 rm -rf $PWD/arch/arm64/boot/dtb
