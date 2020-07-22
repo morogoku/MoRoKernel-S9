@@ -29,7 +29,7 @@ DEFCONFIG_S9PLUS=965_defconfig
 DEFCONFIG_S9=960_defconfig
 
 export K_VERSION="v2"
-export K_BASE="DTAA"
+export K_BASE="DTB4"
 export K_NAME="MoRoKernel-S9"
 export KBUILD_BUILD_VERSION="1"
 export KERNEL_VERSION="$K_NAME-$K_BASE-Q-$K_VERSION"
